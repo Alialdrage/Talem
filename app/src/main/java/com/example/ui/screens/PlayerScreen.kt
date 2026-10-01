@@ -29,7 +29,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Balance
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Check
@@ -83,8 +85,10 @@ import com.example.data.model.TajweedCategory
 import com.example.data.model.TajweedRule
 import com.example.ui.UiState
 import com.example.ui.components.AppHeader
+import com.example.ui.components.CustomQuranSeekBar
 import com.example.ui.components.InteractiveAyahText
 import com.example.ui.components.QuranPlayerControls
+import com.example.ui.components.SalawatDhikrCard
 import com.example.ui.components.TajweedColorLegend
 import com.example.ui.components.TajweedRuleDetailDialog
 import com.example.ui.theme.EmeraldDark
@@ -117,6 +121,7 @@ fun PlayerScreen(
     onResetFontSize: () -> Unit = {},
     onSetFontSize: (Int) -> Unit = {},
     onOpenSurahsList: () -> Unit = {},
+    onSelectTafsirBook: (TafsirBook) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showReciterDialog by remember { mutableStateOf(false) }
@@ -138,8 +143,14 @@ fun PlayerScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // بطاقة ذكر الصلاة على محمد وآل محمد وعجل فرجهم الشريفة
             item {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
+                SalawatDhikrCard()
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(2.dp))
 
                 // Surah horizontal selection pills with navigation to all Surahs list
                 Row(
@@ -337,11 +348,15 @@ fun PlayerScreen(
                     onResetFontSize = onResetFontSize,
                     onSetFontSize = onSetFontSize,
                     onToggleFavorite = { onToggleFavorite(uiState.selectedSurah.id) },
-                    onSelectRule = onSelectTajweedRule
+                    onSelectRule = onSelectTajweedRule,
+                    selectedTafsirBook = uiState.selectedTafsirBook,
+                    onSelectTafsirBook = onSelectTafsirBook,
+                    playerState = playerState,
+                    onSeek = onSeek
                 )
             }
 
-            // Audio Player Controls (أزرار التشغيل، الإيقاف المؤقت، الإطفاء، التكرار)
+            // Audio Player Controls (أزرار التشغيل، الإيقاف المؤقت، الإطفاء، التكرار، شريط التمرير المخصص، وتبديل التفسير)
             item {
                 QuranPlayerControls(
                     playerState = playerState,
@@ -351,7 +366,10 @@ fun PlayerScreen(
                     onToggleRepeat = onToggleRepeat,
                     onSeek = onSeek,
                     onSpeedChange = onSpeedChange,
-                    onVolumeChange = onVolumeChange
+                    onVolumeChange = onVolumeChange,
+                    selectedSurah = uiState.selectedSurah,
+                    selectedTafsirBook = uiState.selectedTafsirBook,
+                    onSelectTafsirBook = onSelectTafsirBook
                 )
             }
 
@@ -546,11 +564,14 @@ fun SurahInteractiveTajweedBox(
     onSetFontSize: (Int) -> Unit = {},
     onToggleFavorite: () -> Unit,
     onSelectRule: (TajweedRule) -> Unit,
+    selectedTafsirBook: TafsirBook = TafsirBook.AL_MIZAN,
+    onSelectTafsirBook: (TafsirBook) -> Unit = {},
+    playerState: PlayerState? = null,
+    onSeek: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     // Track expanded Tafsir state for verses in this surah
     var expandedTafsirAyahs by remember(surah.id) { mutableStateOf(setOf<Int>()) }
-    var selectedTafsirBook by remember { mutableStateOf(TafsirBook.AL_MIZAN) }
     var showAlMizanOverview by remember(surah.id) { mutableStateOf(false) }
     var showMajmaAlBayanOverview by remember(surah.id) { mutableStateOf(false) }
 
@@ -814,7 +835,7 @@ fun SurahInteractiveTajweedBox(
                         color = GoldPrimary.copy(alpha = 0.15f)
                     ) {
                         Text(
-                            text = "مجمع البيان • الأمثل • الميسر 📖",
+                            text = "الميزان • مجمع البيان • الأمثل • الميسر ⚖️📖",
                             fontSize = 10.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = GoldDark,
@@ -823,7 +844,7 @@ fun SurahInteractiveTajweedBox(
                     }
                 }
 
-                // اختيار كتاب التفسير المعتمد: مجمع البيان (الطبرسي)، تفسير الأمثل، التفسير الميسر
+                // اختيار كتاب التفسير المعتمد مع أيقونات التبديل السلس: الميزان، مجمع البيان، الأمثل، الميسر
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -831,38 +852,44 @@ fun SurahInteractiveTajweedBox(
                 ) {
                     TafsirBook.values().forEach { book ->
                         val isSelected = selectedTafsirBook == book
+                        val bookIcon = when (book) {
+                            TafsirBook.AL_MIZAN -> Icons.Default.Balance
+                            TafsirBook.MAJMA_AL_BAYAN -> Icons.Default.AutoStories
+                            TafsirBook.AL_AMTHAL -> Icons.Default.Lightbulb
+                            TafsirBook.MUYASSAR -> Icons.Default.MenuBook
+                        }
                         Surface(
-                            onClick = { selectedTafsirBook = book },
-                            shape = RoundedCornerShape(8.dp),
+                            onClick = { onSelectTafsirBook(book) },
+                            shape = RoundedCornerShape(10.dp),
                             color = if (isSelected) EmeraldPrimary else Color.White,
                             border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (isSelected) EmeraldDark else EmeraldPrimary.copy(alpha = 0.3f)
+                                1.2.dp,
+                                if (isSelected) EmeraldDark else EmeraldPrimary.copy(alpha = 0.35f)
                             ),
                             modifier = Modifier.weight(1f).testTag("btn_select_book_${book.id}")
                         ) {
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(vertical = 7.dp, horizontal = 4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.MenuBook,
-                                    contentDescription = null,
-                                    tint = if (isSelected) Color.White else EmeraldPrimary,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = book.shortTitle,
-                                    fontSize = 10.5.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) Color.White else EmeraldDark
-                                )
-                            }
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = bookIcon,
+                                contentDescription = book.shortTitle,
+                                tint = if (isSelected) Color.White else EmeraldPrimary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = book.shortTitle,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) Color.White else EmeraldDark
+                            )
                         }
                     }
                 }
+            }
 
                 // بطاقة مقدمة ومقاصد السورة في «تفسير الميزان» للعلامة الطباطبائي
                 if (surah.alMizanOverview.isNotBlank()) {
@@ -1157,29 +1184,41 @@ fun SurahInteractiveTajweedBox(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                                 ) {
+                                                    val selectedIcon = when (selectedTafsirBook) {
+                                                        TafsirBook.AL_MIZAN -> Icons.Default.Balance
+                                                        TafsirBook.MAJMA_AL_BAYAN -> Icons.Default.AutoStories
+                                                        TafsirBook.AL_AMTHAL -> Icons.Default.Lightbulb
+                                                        TafsirBook.MUYASSAR -> Icons.Default.MenuBook
+                                                    }
                                                     Icon(
-                                                        imageVector = Icons.Default.MenuBook,
+                                                        imageVector = selectedIcon,
                                                         contentDescription = null,
-                                                        tint = if (selectedTafsirBook == TafsirBook.AL_AMTHAL) EmeraldPrimary else GoldDark,
-                                                        modifier = Modifier.size(13.dp)
+                                                        tint = if (selectedTafsirBook == TafsirBook.AL_MIZAN || selectedTafsirBook == TafsirBook.AL_AMTHAL) EmeraldPrimary else GoldDark,
+                                                        modifier = Modifier.size(14.dp)
                                                     )
                                                     Spacer(modifier = Modifier.width(5.dp))
                                                     Text(
                                                         text = "${selectedTafsirBook.shortTitle} • الآية (${ayah.numberInSurah})",
                                                         fontSize = 11.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        color = if (selectedTafsirBook == TafsirBook.AL_AMTHAL || selectedTafsirBook == TafsirBook.MAJMA_AL_BAYAN) EmeraldPrimary else GoldDark
+                                                        color = if (selectedTafsirBook == TafsirBook.AL_MIZAN || selectedTafsirBook == TafsirBook.AL_AMTHAL) EmeraldPrimary else GoldDark
                                                     )
                                                 }
                                             }
 
-                                            // مفاتيح التبديل السريع بين كتب التفسير الثلاثة (مجمع البيان، الأمثل، الميسر)
+                                            // مفاتيح التبديل السريع بين كتب التفسير الأربعة مع الأيقونات المخصصة
                                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                                 TafsirBook.values().forEach { book ->
                                                     val isBookSelected = selectedTafsirBook == book
+                                                    val bookIcon = when (book) {
+                                                        TafsirBook.AL_MIZAN -> Icons.Default.Balance
+                                                        TafsirBook.MAJMA_AL_BAYAN -> Icons.Default.AutoStories
+                                                        TafsirBook.AL_AMTHAL -> Icons.Default.Lightbulb
+                                                        TafsirBook.MUYASSAR -> Icons.Default.MenuBook
+                                                    }
                                                     Surface(
-                                                        onClick = { selectedTafsirBook = book },
-                                                        shape = RoundedCornerShape(6.dp),
+                                                        onClick = { onSelectTafsirBook(book) },
+                                                        shape = RoundedCornerShape(8.dp),
                                                         color = if (isBookSelected) EmeraldPrimary else Color.White,
                                                         border = androidx.compose.foundation.BorderStroke(
                                                             1.dp,
@@ -1187,13 +1226,24 @@ fun SurahInteractiveTajweedBox(
                                                         ),
                                                         modifier = Modifier.testTag("btn_select_tafsir_${book.id}")
                                                     ) {
-                                                        Text(
-                                                            text = book.shortTitle,
-                                                            fontSize = 10.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = if (isBookSelected) Color.White else EmeraldDark,
-                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                                                        )
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = bookIcon,
+                                                                contentDescription = book.shortTitle,
+                                                                tint = if (isBookSelected) Color.White else EmeraldPrimary,
+                                                                modifier = Modifier.size(12.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.width(3.dp))
+                                                            Text(
+                                                                text = book.shortTitle,
+                                                                fontSize = 9.5.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = if (isBookSelected) Color.White else EmeraldDark
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }

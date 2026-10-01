@@ -153,7 +153,8 @@ fun QuranAppRoot(viewModel: QuranViewModel) {
                     onDecreaseFontSize = { viewModel.decreaseFontSize() },
                     onResetFontSize = { viewModel.resetFontSize() },
                     onSetFontSize = { viewModel.setFontSize(it) },
-                    onOpenSurahsList = { viewModel.selectTab(AppTab.SURAHS) }
+                    onOpenSurahsList = { viewModel.selectTab(AppTab.SURAHS) },
+                    onSelectTafsirBook = { viewModel.selectTafsirBook(it) }
                 )
 
                 AppTab.SURAHS -> SurahsScreen(

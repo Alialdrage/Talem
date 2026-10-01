@@ -33,6 +33,7 @@ data class PlayerState(
     val speed: Float = 1.0f,
     val volume: Float = 1.0f,
     val currentUrl: String = "",
+    val isLiveStream: Boolean = false,
     val errorMessage: String? = null
 )
 
@@ -42,6 +43,13 @@ class QuranAudioPlayer(private val context: Context) {
     private var mediaPlayer: MediaPlayer? = null
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var progressJob: Job? = null
+
+    // Track whether the MediaPlayer is currently in a prepared state
+    @Volatile
+    private var isPrepared: Boolean = false
+
+    // Position requested by user while player was buffering, idle, or stopped
+    private var pendingSeekPositionMs: Int? = null
 
     private val _playerState = MutableStateFlow(PlayerState())
     val playerState: StateFlow<PlayerState> = _playerState.asStateFlow()
@@ -57,39 +65,81 @@ class QuranAudioPlayer(private val context: Context) {
                 )
                 setOnPreparedListener { mp ->
                     Log.d(TAG, "MediaPlayer prepared, duration=${mp.duration}")
+                    isPrepared = true
+                    val isLive = _playerState.value.isLiveStream
+                    val duration = if (!isLive && mp.duration > 0) mp.duration else 0
+
+                    // If a seek was queued during buffering/idle and not live, apply it now safely
+                    val targetSeek = if (!isLive) pendingSeekPositionMs else null
+                    pendingSeekPositionMs = null
+                    val startPos = if (targetSeek != null && duration > 0) {
+                        val clamped = targetSeek.coerceIn(0, duration)
+                        try {
+                            mp.seekTo(clamped)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to apply queued seek in onPrepared", e)
+                        }
+                        clamped
+                    } else {
+                        0
+                    }
+
                     _playerState.value = _playerState.value.copy(
                         status = PlaybackStatus.PLAYING,
-                        durationMs = mp.duration,
+                        durationMs = duration,
+                        currentPositionMs = startPos,
                         errorMessage = null
                     )
                     applySpeedAndVolume()
-                    mp.start()
+                    try {
+                        mp.start()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to start playback in onPrepared", e)
+                    }
                     startProgressTracker()
                 }
-                setOnCompletionListener {
+                setOnCompletionListener { mp ->
                     Log.d(TAG, "MediaPlayer completed")
                     stopProgressTracker()
                     if (_playerState.value.isRepeating) {
-                        it.seekTo(0)
-                        it.start()
-                        _playerState.value = _playerState.value.copy(
-                            status = PlaybackStatus.PLAYING,
-                            currentPositionMs = 0
-                        )
-                        startProgressTracker()
-                    } else {
-                        _playerState.value = _playerState.value.copy(
-                            status = PlaybackStatus.COMPLETED,
-                            currentPositionMs = _playerState.value.durationMs
-                        )
+                        try {
+                            if (isPrepared) {
+                                mp.seekTo(0)
+                                mp.start()
+                                _playerState.value = _playerState.value.copy(
+                                    status = PlaybackStatus.PLAYING,
+                                    currentPositionMs = 0
+                                )
+                                startProgressTracker()
+                                return@setOnCompletionListener
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to repeat playback", e)
+                        }
                     }
-                }
-                setOnErrorListener { _, what, extra ->
-                    Log.e(TAG, "MediaPlayer error: what=$what, extra=$extra")
-                    stopProgressTracker()
+
                     _playerState.value = _playerState.value.copy(
-                        status = PlaybackStatus.ERROR,
-                        errorMessage = "تعذر تشغيل الصوت. يرجى التحقق من اتصال الإنترنت."
+                        status = PlaybackStatus.COMPLETED,
+                        currentPositionMs = _playerState.value.durationMs
+                    )
+                }
+                setOnErrorListener { mp, what, extra ->
+                    Log.e(TAG, "MediaPlayer error: what=$what, extra=$extra")
+                    isPrepared = false
+                    stopProgressTracker()
+                    try {
+                        mp.reset()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error resetting MediaPlayer after error", e)
+                    }
+                    val userErrorMessage = if (what == -38) {
+                        null
+                    } else {
+                        "تعذر تشغيل الصوت. يرجى التحقق من اتصال الإنترنت."
+                    }
+                    _playerState.value = _playerState.value.copy(
+                        status = if (what == -38) PlaybackStatus.STOPPED else PlaybackStatus.ERROR,
+                        errorMessage = userErrorMessage
                     )
                     true
                 }
@@ -97,47 +147,49 @@ class QuranAudioPlayer(private val context: Context) {
         }
     }
 
-    fun playUrl(url: String) {
+    fun playUrl(url: String, isLive: Boolean = false) {
+        if (url.isBlank()) return
         try {
             if (_playerState.value.currentUrl == url && mediaPlayer != null) {
-                // Same audio
                 when (_playerState.value.status) {
                     PlaybackStatus.PAUSED -> {
                         resume()
                         return
                     }
-                    PlaybackStatus.STOPPED, PlaybackStatus.COMPLETED -> {
-                        mediaPlayer?.seekTo(0)
-                        mediaPlayer?.start()
-                        _playerState.value = _playerState.value.copy(
-                            status = PlaybackStatus.PLAYING,
-                            currentPositionMs = 0
-                        )
-                        startProgressTracker()
+                    PlaybackStatus.BUFFERING -> {
+                        // Already preparing this URL
                         return
                     }
                     PlaybackStatus.PLAYING -> {
                         return
                     }
-                    else -> {}
+                    else -> {
+                        // Was STOPPED, COMPLETED, or ERROR - re-prepare cleanly
+                    }
                 }
             }
 
-            // New URL or player reset
-            stop()
+            // Clean stop and prepare
+            stopProgressTracker()
+            isPrepared = false
             initPlayer()
+
             _playerState.value = _playerState.value.copy(
                 status = PlaybackStatus.BUFFERING,
                 currentUrl = url,
+                isLiveStream = isLive,
                 errorMessage = null,
-                currentPositionMs = 0
+                currentPositionMs = if (isLive) 0 else (pendingSeekPositionMs ?: 0)
             )
 
-            mediaPlayer?.reset()
-            mediaPlayer?.setDataSource(url)
-            mediaPlayer?.prepareAsync()
+            mediaPlayer?.apply {
+                reset()
+                setDataSource(url)
+                prepareAsync()
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error playing audio URL: $url", e)
+            isPrepared = false
             _playerState.value = _playerState.value.copy(
                 status = PlaybackStatus.ERROR,
                 errorMessage = "خطأ في تحميل التلاوة: ${e.localizedMessage ?: "تأكد من الاتصال"}"
@@ -147,38 +199,56 @@ class QuranAudioPlayer(private val context: Context) {
 
     // 1. زر التشغيل والاستئناف
     fun resume() {
-        mediaPlayer?.let {
-            if (!it.isPlaying) {
-                it.start()
-                _playerState.value = _playerState.value.copy(status = PlaybackStatus.PLAYING)
-                startProgressTracker()
+        val mp = mediaPlayer
+        if (mp != null && isPrepared) {
+            try {
+                if (!mp.isPlaying) {
+                    mp.start()
+                    _playerState.value = _playerState.value.copy(status = PlaybackStatus.PLAYING)
+                    startProgressTracker()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error in resume()", e)
             }
+        } else if (_playerState.value.currentUrl.isNotBlank()) {
+            playUrl(_playerState.value.currentUrl)
         }
     }
 
     // 2. زر الإيقاف المؤقت
     fun pause() {
-        mediaPlayer?.let {
-            if (it.isPlaying) {
-                it.pause()
-                stopProgressTracker()
-                _playerState.value = _playerState.value.copy(status = PlaybackStatus.PAUSED)
+        val mp = mediaPlayer
+        if (mp != null && isPrepared) {
+            try {
+                if (mp.isPlaying) {
+                    mp.pause()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error in pause()", e)
             }
         }
+        stopProgressTracker()
+        _playerState.value = _playerState.value.copy(status = PlaybackStatus.PAUSED)
     }
 
     // 3. زر الإطفاء والإيقاف التام (Stop / Turn Off)
     fun stop() {
         stopProgressTracker()
+        isPrepared = false
+        pendingSeekPositionMs = null
         try {
-            mediaPlayer?.let {
-                if (it.isPlaying) {
-                    it.stop()
+            mediaPlayer?.let { mp ->
+                try {
+                    if (mp.isPlaying) {
+                        mp.stop()
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error stopping media player", e)
                 }
-                it.reset()
+                mp.reset()
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Error stopping media player", e)
+            Log.w(TAG, "Error resetting media player on stop", e)
         }
         _playerState.value = _playerState.value.copy(
             status = PlaybackStatus.STOPPED,
@@ -192,12 +262,29 @@ class QuranAudioPlayer(private val context: Context) {
         _playerState.value = _playerState.value.copy(isRepeating = nextRepeat)
     }
 
-    // التقديم والتأخير عبر شريط التقدم
+    // التقديم والتأخير الآمن عبر شريط التقدم (Seek) مع حماية كاملة من استدعاء seekTo في حالة خاطئة
     fun seekTo(positionMs: Int) {
-        mediaPlayer?.let {
-            val clamped = positionMs.coerceIn(0, _playerState.value.durationMs)
-            it.seekTo(clamped)
-            _playerState.value = _playerState.value.copy(currentPositionMs = clamped)
+        if (_playerState.value.isLiveStream) {
+            // البث المباشر الحي مستمر ولا يقبل التقديم والتأخير
+            return
+        }
+        val duration = _playerState.value.durationMs
+        val clamped = if (duration > 0) positionMs.coerceIn(0, duration) else positionMs.coerceAtLeast(0)
+        _playerState.value = _playerState.value.copy(currentPositionMs = clamped)
+
+        val mp = mediaPlayer
+        val currentStatus = _playerState.value.status
+        if (mp != null && isPrepared && (currentStatus == PlaybackStatus.PLAYING || currentStatus == PlaybackStatus.PAUSED || currentStatus == PlaybackStatus.COMPLETED)) {
+            try {
+                mp.seekTo(clamped)
+            } catch (e: Exception) {
+                Log.w(TAG, "Safe seekTo failed", e)
+            }
+        } else {
+            // Player is either BUFFERING (preparing), IDLE, or STOPPED.
+            // Queue the target seek position to apply as soon as MediaPlayer is prepared.
+            pendingSeekPositionMs = clamped
+            Log.d(TAG, "seekTo safely queued for $clamped ms while player status=$currentStatus (isPrepared=$isPrepared)")
         }
     }
 
@@ -211,11 +298,18 @@ class QuranAudioPlayer(private val context: Context) {
     fun setVolume(volume: Float) {
         val clamped = volume.coerceIn(0f, 1f)
         _playerState.value = _playerState.value.copy(volume = clamped)
-        mediaPlayer?.setVolume(clamped, clamped)
+        mediaPlayer?.let { mp ->
+            try {
+                mp.setVolume(clamped, clamped)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not set volume", e)
+            }
+        }
     }
 
     private fun applySpeedAndVolume() {
-        mediaPlayer?.let { mp ->
+        val mp = mediaPlayer
+        if (mp != null && isPrepared) {
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     val currentParams = mp.playbackParams
@@ -233,12 +327,17 @@ class QuranAudioPlayer(private val context: Context) {
         progressJob?.cancel()
         progressJob = scope.launch {
             while (isActive) {
-                mediaPlayer?.let { mp ->
-                    if (mp.isPlaying) {
-                        _playerState.value = _playerState.value.copy(
-                            currentPositionMs = mp.currentPosition,
-                            durationMs = if (mp.duration > 0) mp.duration else _playerState.value.durationMs
-                        )
+                val mp = mediaPlayer
+                if (mp != null && isPrepared) {
+                    try {
+                        if (mp.isPlaying) {
+                            _playerState.value = _playerState.value.copy(
+                                currentPositionMs = mp.currentPosition,
+                                durationMs = if (mp.duration > 0) mp.duration else _playerState.value.durationMs
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error checking current position in progress tracker", e)
                     }
                 }
                 delay(300)
@@ -253,6 +352,8 @@ class QuranAudioPlayer(private val context: Context) {
 
     fun release() {
         stopProgressTracker()
+        isPrepared = false
+        pendingSeekPositionMs = null
         try {
             mediaPlayer?.release()
         } catch (e: Exception) {

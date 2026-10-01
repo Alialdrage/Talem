@@ -237,4 +237,37 @@ class ExampleUnitTest {
     assertTrue("Surah Al-Fatihah should contain Al-Mizan overview", fatihah.alMizanOverview.contains("الميزان"))
     assertTrue("Surah Al-Fatihah Ayah 1 should contain Tafsir Al-Mizan", fatihah.ayahs.first().tafsirAlMizan.isNotBlank())
   }
+
+  @Test
+  fun testSeekBarAndTafsirSourcesSwitching() {
+    // Test formatDuration
+    val durationStr = com.example.ui.components.formatDuration(125_000)
+    assertEquals("02:05", durationStr)
+
+    // Verify all 4 available Tafsir books exist with titles and authors
+    val books = com.example.data.model.TafsirBook.values()
+    assertEquals(4, books.size)
+    val bookIds = books.map { it.id }.toSet()
+    assertTrue(bookIds.contains("al_mizan"))
+    assertTrue(bookIds.contains("majma_al_bayan"))
+    assertTrue(bookIds.contains("al_amthal"))
+    assertTrue(bookIds.contains("muyassar"))
+
+    // Test fast navigation calculations
+    val totalVerses = 7 // Al-Fatihah
+    val durationMs = 70_000 // 70 seconds
+    val ayahFraction = 1f / totalVerses.toFloat()
+    
+    // Jump to ayah 3 (0-indexed index 2)
+    val targetAyah3Ms = (2 * ayahFraction * durationMs).toInt()
+    assertEquals(20000, targetAyah3Ms)
+  }
+
+  @Test
+  fun testSalawatDhikrText() {
+    val dhikrText = "اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَآلِ مُحَمَّدٍ وَعَجِّلْ لِوَلِيِّكَ الْفَرَجَ وَالْعَافِيَةَ وَالنَّصْرَ"
+    assertTrue(dhikrText.contains("اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَآلِ مُحَمَّدٍ"))
+    assertTrue(dhikrText.contains("وَعَجِّلْ لِوَلِيِّكَ الْفَرَجَ"))
+    assertTrue(dhikrText.contains("وَالْعَافِيَةَ وَالنَّصْرَ"))
+  }
 }

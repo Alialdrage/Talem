@@ -23,7 +23,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.filled.Balance
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CheckCircle
@@ -33,6 +35,8 @@ import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
@@ -42,12 +46,14 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -77,6 +83,8 @@ import com.example.audio.PlaybackStatus
 import com.example.audio.PlayerState
 import com.example.data.model.Ayah
 import com.example.data.model.Reciter
+import com.example.data.model.Surah
+import com.example.data.model.TafsirBook
 import com.example.data.model.TajweedCategory
 import com.example.data.model.TajweedRule
 import com.example.ui.theme.EmeraldDark
@@ -86,6 +94,8 @@ import com.example.ui.theme.ErrorRed
 import com.example.ui.theme.GoldDark
 import com.example.ui.theme.GoldLight
 import com.example.ui.theme.GoldPrimary
+import com.example.ui.theme.VerseCardBg
+import com.example.ui.theme.VerseCardBorder
 import com.example.ui.theme.WarningOrange
 
 @Composable
@@ -181,6 +191,164 @@ fun AppHeader(
                 fontSize = 12.sp,
                 textAlign = TextAlign.Center
             )
+
+            // ذكر الصلاة على محمد وآل محمد وعجل فرجهم المبارك في رأس التطبيق
+            Spacer(modifier = Modifier.height(6.dp))
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = if (isNightMode) GoldDark.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.16f),
+                border = BorderStroke(
+                    1.dp,
+                    if (isNightMode) GoldLight.copy(alpha = 0.5f) else GoldLight.copy(alpha = 0.65f)
+                ),
+                modifier = Modifier.testTag("header_salawat_dhikr")
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "✨ اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَآلِ مُحَمَّدٍ وَعَجِّلْ لِوَلِيِّكَ الْفَرَجَ وَالْعَافِيَةَ وَالنَّصْرَ ✨",
+                        color = if (isNightMode) GoldLight else Color.White,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * بطاقة ذكر الصلاة على محمد وآل محمد وعجل فرجهم الشريفة مع عدّاد التسبيح والمداومة
+ */
+@Composable
+fun SalawatDhikrCard(
+    modifier: Modifier = Modifier
+) {
+    var salawatCount by remember { mutableStateOf(0) }
+
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = VerseCardBg
+        ),
+        border = BorderStroke(1.2.dp, GoldPrimary.copy(alpha = 0.6f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("salawat_dhikr_card")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = GoldPrimary.copy(alpha = 0.18f)
+                ) {
+                    Text(
+                        text = "ذكر مبارك 🌿",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GoldDark,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = EmeraldPrimary.copy(alpha = 0.12f)
+                ) {
+                    Text(
+                        text = "الصلوات: $salawatCount",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EmeraldPrimary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // نص الذكر الشريف مع التشكيل الكامل
+            Text(
+                text = "«اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَآلِ مُحَمَّدٍ وَعَجِّلْ لِوَلِيِّكَ الْفَرَجَ وَالْعَافِيَةَ وَالنَّصْرَ»",
+                fontSize = 15.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = EmeraldDark,
+                textAlign = TextAlign.Center,
+                lineHeight = 24.sp,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "الصلاة على النبي وآله مفتاح تفريج الهموم واستجابة الدعاء وتيسير تدبر القرآن الكريم",
+                fontSize = 10.5.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    onClick = { salawatCount++ },
+                    shape = RoundedCornerShape(12.dp),
+                    color = EmeraldPrimary,
+                    modifier = Modifier.testTag("btn_increment_salawat")
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = "صلوات",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "صلِّ على محمد وآل محمد (+1)",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                if (salawatCount > 0) {
+                    Spacer(modifier = Modifier.width(10.dp))
+                    TextButton(
+                        onClick = { salawatCount = 0 },
+                        modifier = Modifier.testTag("btn_reset_salawat")
+                    ) {
+                        Text(
+                            text = "إعادة ضبط",
+                            fontSize = 11.sp,
+                            color = GoldDark,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -195,6 +363,9 @@ fun QuranPlayerControls(
     onSeek: (Int) -> Unit,
     onSpeedChange: (Float) -> Unit,
     onVolumeChange: (Float) -> Unit,
+    selectedSurah: Surah? = null,
+    selectedTafsirBook: TafsirBook = TafsirBook.AL_MIZAN,
+    onSelectTafsirBook: ((TafsirBook) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val isPlaying = playerState.status == PlaybackStatus.PLAYING
@@ -260,53 +431,13 @@ fun QuranPlayerControls(
                 }
             }
 
-            // Seekbar
-            val currentPos = playerState.currentPositionMs.toFloat()
-            val duration = if (playerState.durationMs > 0) playerState.durationMs.toFloat() else 1f
-            val sliderValue = (currentPos / duration).coerceIn(0f, 1f)
-
-            var isDragging by remember { mutableStateOf(false) }
-            var dragProgress by remember { mutableStateOf(0f) }
-
-            Slider(
-                value = if (isDragging) dragProgress else sliderValue,
-                onValueChange = {
-                    isDragging = true
-                    dragProgress = it
-                },
-                onValueChangeFinished = {
-                    val targetMs = (dragProgress * duration).toInt()
-                    onSeek(targetMs)
-                    isDragging = false
-                },
-                colors = SliderDefaults.colors(
-                    thumbColor = EmeraldPrimary,
-                    activeTrackColor = EmeraldPrimary,
-                    inactiveTrackColor = EmeraldPrimary.copy(alpha = 0.2f)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("audio_seekbar")
+            // Custom Quran Seekbar (شريط التمرير والتنقل السريع داخل السورة)
+            CustomQuranSeekBar(
+                playerState = playerState,
+                onSeek = onSeek,
+                totalVersesCount = selectedSurah?.versesCount ?: 1,
+                surahName = selectedSurah?.nameArabic ?: ""
             )
-
-            // Time stamps
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = formatDuration(playerState.currentPositionMs),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = formatDuration(playerState.durationMs),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -485,6 +616,119 @@ fun QuranPlayerControls(
                         modifier = Modifier.weight(1f)
                     )
                 }
+            }
+
+            // شريط تحويل التفسير بين المصادر المتاحة بسلاسة مع الأيقونات المخصصة
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(
+                thickness = 0.8.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Header for Tafsir Switcher
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.SwapHoriz,
+                        contentDescription = "تحويل التفسير",
+                        tint = EmeraldPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = "تحويل التفسير بين المصادر المتاحة:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = EmeraldPrimary.copy(alpha = 0.12f)
+                ) {
+                    Text(
+                        text = selectedTafsirBook.shortTitle,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = EmeraldPrimary,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 4 Icon buttons for Tafsir sources (الميزان، مجمع البيان، الأمثل، الميسر)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                TafsirBook.values().forEach { book ->
+                    val isBookSelected = selectedTafsirBook == book
+                    val (icon, tag) = when (book) {
+                        TafsirBook.AL_MIZAN -> Pair(Icons.Default.Balance, "btn_player_tafsir_al_mizan")
+                        TafsirBook.MAJMA_AL_BAYAN -> Pair(Icons.Default.AutoStories, "btn_player_tafsir_majma_al_bayan")
+                        TafsirBook.AL_AMTHAL -> Pair(Icons.Default.Lightbulb, "btn_player_tafsir_al_amthal")
+                        TafsirBook.MUYASSAR -> Pair(Icons.Default.MenuBook, "btn_player_tafsir_muyassar")
+                    }
+
+                    Surface(
+                        onClick = { onSelectTafsirBook?.invoke(book) },
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (isBookSelected) EmeraldPrimary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isBookSelected) EmeraldDark else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag(tag)
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = book.shortTitle,
+                                tint = if (isBookSelected) Color.White else EmeraldPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = book.shortTitle,
+                                fontSize = 10.sp,
+                                fontWeight = if (isBookSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isBookSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Author and source description badge
+            Spacer(modifier = Modifier.height(6.dp))
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "المصدر المعتمد: ${selectedTafsirBook.title} — ${selectedTafsirBook.author}",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
             }
         }
     }

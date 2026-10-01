@@ -43,9 +43,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.filled.Balance
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.NavigateNext
@@ -399,8 +402,14 @@ fun PracticeScreen(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                             ) {
+                                                val selectedIcon = when (practiceTafsirBook) {
+                                                    TafsirBook.AL_MIZAN -> Icons.Default.Balance
+                                                    TafsirBook.MAJMA_AL_BAYAN -> Icons.Default.AutoStories
+                                                    TafsirBook.AL_AMTHAL -> Icons.Default.Lightbulb
+                                                    TafsirBook.MUYASSAR -> Icons.Default.MenuBook
+                                                }
                                                 Icon(
-                                                    imageVector = Icons.Default.MenuBook,
+                                                    imageVector = selectedIcon,
                                                     contentDescription = null,
                                                     tint = EmeraldPrimary,
                                                     modifier = Modifier.size(13.dp)
@@ -418,27 +427,44 @@ fun PracticeScreen(
                                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                             TafsirBook.values().forEach { book ->
                                                 val isSelected = practiceTafsirBook == book
+                                                val bookIcon = when (book) {
+                                                    TafsirBook.AL_MIZAN -> Icons.Default.Balance
+                                                    TafsirBook.MAJMA_AL_BAYAN -> Icons.Default.AutoStories
+                                                    TafsirBook.AL_AMTHAL -> Icons.Default.Lightbulb
+                                                    TafsirBook.MUYASSAR -> Icons.Default.MenuBook
+                                                }
                                                 Surface(
                                                     onClick = { practiceTafsirBook = book },
-                                                    shape = RoundedCornerShape(6.dp),
+                                                    shape = RoundedCornerShape(8.dp),
                                                     color = if (isSelected) EmeraldPrimary else MaterialTheme.colorScheme.surfaceVariant,
                                                     border = BorderStroke(
                                                         1.dp,
                                                         if (isSelected) EmeraldDark else Color.Transparent
                                                     )
                                                 ) {
-                                                    Text(
-                                                        text = when (book) {
-                                                            TafsirBook.AL_MIZAN -> "الميزان"
-                                                            TafsirBook.MAJMA_AL_BAYAN -> "مجمع البيان"
-                                                            TafsirBook.AL_AMTHAL -> "الأمثل"
-                                                            TafsirBook.MUYASSAR -> "الميسر"
-                                                        },
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
                                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                                                    )
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = bookIcon,
+                                                            contentDescription = null,
+                                                            tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.size(12.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(3.dp))
+                                                        Text(
+                                                            text = when (book) {
+                                                                TafsirBook.AL_MIZAN -> "الميزان"
+                                                                TafsirBook.MAJMA_AL_BAYAN -> "مجمع البيان"
+                                                                TafsirBook.AL_AMTHAL -> "الأمثل"
+                                                                TafsirBook.MUYASSAR -> "الميسر"
+                                                            },
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }

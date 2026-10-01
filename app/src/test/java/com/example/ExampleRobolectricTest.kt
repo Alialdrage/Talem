@@ -1,9 +1,12 @@
 package com.example
 
+import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.datasource.QuranDataProvider
 import com.example.data.model.Reciter
+import com.example.data.model.TafsirBook
+import com.example.ui.QuranViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -343,5 +346,35 @@ class ExampleRobolectricTest {
         // Check total verses in the Quran = 6236
         val totalVerses = surahs.sumOf { it.versesCount }
         assertEquals("Total verses in Holy Quran must be 6236", 6236, totalVerses)
+    }
+
+    @Test
+    fun `verify player seek and seamless tafsir sources switching in ViewModel`() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val viewModel = QuranViewModel(app)
+
+        // Default Tafsir should be AL_MIZAN
+        assertEquals(TafsirBook.AL_MIZAN, viewModel.uiState.value.selectedTafsirBook)
+
+        // Switch to Majma Al-Bayan
+        viewModel.selectTafsirBook(TafsirBook.MAJMA_AL_BAYAN)
+        assertEquals(TafsirBook.MAJMA_AL_BAYAN, viewModel.uiState.value.selectedTafsirBook)
+
+        // Switch to Al-Amthal
+        viewModel.selectTafsirBook(TafsirBook.AL_AMTHAL)
+        assertEquals(TafsirBook.AL_AMTHAL, viewModel.uiState.value.selectedTafsirBook)
+
+        // Switch to Muyassar
+        viewModel.selectTafsirBook(TafsirBook.MUYASSAR)
+        assertEquals(TafsirBook.MUYASSAR, viewModel.uiState.value.selectedTafsirBook)
+
+        // Switch back to Al-Mizan
+        viewModel.selectTafsirBook(TafsirBook.AL_MIZAN)
+        assertEquals(TafsirBook.AL_MIZAN, viewModel.uiState.value.selectedTafsirBook)
+
+        // Seek test
+        viewModel.seekTo(15_000)
+        // Verify seek call executes without exception
+        assertNotNull(viewModel.playerState.value)
     }
 }

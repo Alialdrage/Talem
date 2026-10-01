@@ -175,8 +175,8 @@ class QuranViewModel(application: Application) : AndroidViewModel(application) {
         player.stop()
         _uiState.value = _uiState.value.copy(selectedReciter = reciter)
         if (wasPlaying) {
-            playCurrentSurah()
             player.seekTo(currentPos)
+            playCurrentSurah()
         }
     }
 
