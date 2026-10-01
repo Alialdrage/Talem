@@ -1,0 +1,6 @@
+{
+  "name": "تعليم القرآن",
+  "description": "برنامج تعليم قراءة القرآن الكريم مع مشغل تلاوة المعلم وفهرس السور (البقرة، آل عمران، النساء، الجمعة) وتفسير مجمع البيان وتفسير الأمثل والتفسير الميسر",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
